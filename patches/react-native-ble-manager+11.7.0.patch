@@ -1,0 +1,22 @@
+diff --git a/node_modules/react-native-ble-manager/android/build.gradle b/node_modules/react-native-ble-manager/android/build.gradle
+index 02c8e17..f7e6202 100644
+--- a/node_modules/react-native-ble-manager/android/build.gradle
++++ b/node_modules/react-native-ble-manager/android/build.gradle
+@@ -5,7 +5,7 @@ buildscript {
+ 	if (project == rootProject) {
+ 		repositories {
+ 			google()
+-			jcenter()
++			mavenCentral()
+ 		}
+ 
+ 		dependencies {
+@@ -44,7 +44,7 @@ android {
+ repositories {
+ 	mavenCentral()
+ 	google()
+-	jcenter()
++	//jcenter()
+ 	maven {
+ 		// All of React Native (JS, Obj-C sources, Android binaries) is installed from npm
+ 		//url "$rootDir/../node_modules/react-native/android"

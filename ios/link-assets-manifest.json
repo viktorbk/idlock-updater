@@ -1,0 +1,33 @@
+{
+  "migIndex": 1,
+  "data": [
+    {
+      "path": "assets/fonts/ColabBol.ttf",
+      "sha1": "7c76c4fdece1cb27d9174f8f8e2d2cc7ff37a742"
+    },
+    {
+      "path": "assets/fonts/ColabLig.ttf",
+      "sha1": "29929445405ed84098e47d2d9888e1ab6f05cdab"
+    },
+    {
+      "path": "assets/fonts/ColabMed.ttf",
+      "sha1": "bb3bb27c43da3fcc69984e791e9a18b638d730ac"
+    },
+    {
+      "path": "assets/fonts/ColabReg.ttf",
+      "sha1": "028e76f48ce3edd195a07508db55f0c438d79a7b"
+    },
+    {
+      "path": "assets/fonts/ColabThi.ttf",
+      "sha1": "0b76195bf3034b47172f2435c7bf040eb476e7bc"
+    },
+    {
+      "path": "assets/fonts/Ionicons.ttf",
+      "sha1": "86e07c3d974eb09099e6e5a9b3b8310303cf0feb"
+    },
+    {
+      "path": "assets/fonts/MaterialCommunityIcons.ttf",
+      "sha1": "4c2a838b00dbb5e8bb1b368fce0de534e8eb241c"
+    }
+  ]
+}
