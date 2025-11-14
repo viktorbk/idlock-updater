@@ -13,7 +13,7 @@ import {
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Welcome'>;
 
-const BLE_SCAN_DURATION = 15; // Should match BLE_SCAN_SEK in BleProvider
+const BLE_SCAN_DURATION = 20; // Should match BLE_SCAN_SEK in BleProvider
 
 export default function WelcomeScreen({}: Props) {
   const { devices, idlockDevices, bluetoothState, isScanning, scanCountdown, startScan, setCurrentLock } = useBle();

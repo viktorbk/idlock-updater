@@ -95,10 +95,13 @@ if (!mmkvAvailable) {
 // AppState interface
 export interface BleDevice {
   id: string;
-  name: string;
-  rssi: number;
   idlock: boolean;
+  rssi: number;
+  name: string;
+  series: string;
   version: string;
+  inVersion: string;
+  outVersion: string;
 }
 
 interface AppState {
