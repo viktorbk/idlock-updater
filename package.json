@@ -10,6 +10,8 @@
     "start": "react-native start",
     "test": "jest",
     "beep": "afplay /System/Library/Sounds/Glass.aiff",
+    "andclean": "powershell -Command \"Remove-Item -Recurse -Force -ErrorAction SilentlyContinue 'android/app/.cxx'; cd android; .\\gradlew.bat clean -x :app:externalNativeBuildCleanDebug; cd ..\"",
+    "android0": "npx react-native run-android --device=adb-R7AX50TT9XV-SqPAJH._adb-tls-connect._tcp",
     "android4": "adb -s RZ8R122YPAP reverse tcp:9500 tcp:9500 && NODE_OPTIONS='--max-http-header-size=16384' npx react-native run-android --device=R7AX50TT9XV",
     "android5": "npx react-native run-android --device=R7AX50TT9XV",
     "android5-fast": "cd android && ./gradlew assembleDebug -x lint -x test && adb -s R7AX50TT9XV install -r app/build/outputs/apk/debug/app-debug.apk && adb -s R7AX50TT9XV shell am start -n com.idlockupdater/.MainActivity",

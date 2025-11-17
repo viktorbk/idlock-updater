@@ -1,6 +1,7 @@
 import { BleDevice } from "../store/store";
 import RNBlobUtil from 'react-native-blob-util';
 import { Buffer } from 'buffer';
+import { PanelType } from './constants';
 /**
  * Sleep utility function that waits for a specified number of seconds
  * @param seconds - The number of seconds to wait
@@ -14,7 +15,7 @@ export const fetchVersion = async (lockSeries: string, innOrOut: number): Promis
   const headers = {'Content-Type': 'text/plain'};
 
   const basicUrl =
-    innOrOut === 0
+    innOrOut === PanelType.INSIDE_PANEL
       ? 'https://idl150fw.idlock.cloud/idlXXXfw/current/release.txt'
       : 'https://idl150fw.idlock.cloud/idlXXXfw/current/OUT/release.txt';
 
@@ -52,7 +53,7 @@ const chopFile = (data, chunkSize) => {
 
 export const getFirmwareBlob = async (lock: BleDevice, innOrOut: number): Promise<Buffer[]> => {
   let baseUrl = `https://idl150fw.idlock.cloud/idl${lock.series}fw/YYY/FILE.bin`;
-  if(innOrOut) {
+  if(innOrOut === PanelType.OUTSIDE_PANEL) {
     baseUrl = baseUrl.replace('YYY', 'current/OUT');
     baseUrl = baseUrl.replace('FILE', 'IDLock202_MULTI_OUT_' + lock.outVersion.replace(/\./gi, '_'));
   } else {
@@ -73,7 +74,7 @@ export const getFirmwareBlob = async (lock: BleDevice, innOrOut: number): Promis
       // const intPanel = isOutsidePanel ? 1 : 0;
       const upgradeData: Buffer[] = [
         Buffer.from(
-          `FW_Start,${firmwareLength},${firmwareChecksum},${innOrOut === 1 ? 1 : 0}`,
+          `FW_Start,${firmwareLength},${firmwareChecksum},${innOrOut === PanelType.OUTSIDE_PANEL ? PanelType.OUTSIDE_PANEL : PanelType.INSIDE_PANEL}`,
         ),
         ...firmwareParts,
         Buffer.from('FW_End'),

@@ -4,7 +4,15 @@ module.exports = {
   content: ["./src/**/*.{js,jsx,ts,tsx}", "./index.js"],
   presets: [require("nativewind/preset")],
   theme: {
-    extend: {},
+    extend: {
+      fontFamily: {
+        'colab-med': ['ColabMed'],
+        'colab-reg': ['ColabReg'],
+        'colab-bold': ['ColabBol'],
+        'colab-light': ['ColabLig'],
+        'colab-thin': ['ColabThi'],
+      },
+    },
   },
   plugins: [],
 }

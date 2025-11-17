@@ -95,7 +95,7 @@ if (!mmkvAvailable) {
 // AppState interface
 export interface BleDevice {
   id: string;
-  idlock: boolean;
+  type: string;
   rssi: number;
   name: string;
   series: string;
@@ -106,16 +106,18 @@ export interface BleDevice {
 
 interface AppState {
   lockId: string;
+  type: string;
   filesData: string;
   selectedLock: BleDevice | null;
   setLockId: (lockId: string) => void;
+  setType: (type: string) => void;
   setFilesData: (filesData: string) => void;
   setSelectedLock: (lock: BleDevice | null) => void;
   reset: () => void;
 }
-
 // Initial state
 const initialState = {
+  type: '',
   lockId: '',
   filesData: '',
   selectedLock: null as BleDevice | null,
@@ -130,9 +132,13 @@ export const useAppStore = (() => {
         (set) => ({
           ...initialState,
           setLockId: (lockId: string) => set({ lockId }),
+          setType: (type: string) => set({ type }),
           setFilesData: (filesData: string) => set({ filesData }),
           setSelectedLock: (lock: BleDevice | null) => set({ selectedLock: lock }),
-          reset: () => set(initialState),
+          reset: () => set({
+            ...initialState,
+            type: '',
+          }),
         }),
         {
           name: 'idlock-updater-storage',
@@ -146,6 +152,7 @@ export const useAppStore = (() => {
     return create<AppState>()((set) => ({
       ...initialState,
       setLockId: (lockId: string) => set({ lockId }),
+      setType: (type: string) => set({ type }),
       setFilesData: (filesData: string) => set({ filesData }),
       setSelectedLock: (lock: BleDevice | null) => set({ selectedLock: lock }),
       reset: () => set(initialState),

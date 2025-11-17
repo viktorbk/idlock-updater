@@ -8,12 +8,15 @@ import type { RootStackParamList } from '../navigation/types';
 import { sleep, fetchVersion, getFirmwareBlob } from '../utils';
 import ModalError from '../components/ModalError';
 import { Buffer } from 'buffer';
+import { PanelType } from '../utils/constants';
 
 type BleContextValue = {
   devices: BleDevice[];
   idlockDevices: BleDevice[];
   isScanning: boolean;
   scanCountdown: number;
+  indexOfChunk: number;
+  nrOfChunks: number;
   startScan: () => Promise<void>;
   stopScan: () => Promise<void>;
   clearDevices: () => void;
@@ -22,6 +25,7 @@ type BleContextValue = {
   getCurrentLock: () => Promise<BleDevice>;
   isLockConnected: (lockId: string) => Promise<boolean>;
   getConnectedPeripherals: () => Promise<string[]>;
+  updatePanel: (lock: BleDevice, innOrOut: number, onMessage?: (message: string) => void) => Promise<void>;
 };
 
 const BLE_SCAN_SEK = 10;
@@ -38,6 +42,7 @@ type BleProviderProps = {
 export function BleProvider({ children, navigationRef }: BleProviderProps) {
   // Store
   const setSelectedLock = useAppStore((state) => state.setSelectedLock);
+  const setType = useAppStore((state) => state.setType);
   const selectedLock = useAppStore((state) => state.selectedLock);
   // State
   const [devices, setDevices] = useState<BleDevice[]>([]);
@@ -46,6 +51,8 @@ export function BleProvider({ children, navigationRef }: BleProviderProps) {
   const [bluetoothState, setBluetoothState] = useState<boolean>(false);
   const [bleMangerStarted, setBleMangerStarted] = useState<boolean>(false);
   const [scanCountdown, setScanCountdown] = useState(BLE_SCAN_SEK);
+  const [indexOfChunk, setIndexOfChunk] = useState(0);
+  const [nrOfChunks, setNrOfChunks] = useState(0);
   const [errorModalVisible, setErrorModalVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
   const stopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -61,28 +68,6 @@ export function BleProvider({ children, navigationRef }: BleProviderProps) {
     return new NativeEventEmitter();
   }, [bleManagerModule]);
 
-  const checkBleState = useCallback(() => {
-    BleManager.checkState();
-  }, []);
-
-  const clearDevices = useCallback(() => {
-    setDevices([]);
-  }, []);
-
-  const stopScan = useCallback(async () => {
-    try {
-      await BleManager.stopScan();
-    } catch {
-      // ignore
-    } finally {
-      setIsScanning(false);
-      setScanCountdown(BLE_SCAN_SEK);
-      if (stopTimerRef.current) {
-        clearTimeout(stopTimerRef.current);
-        stopTimerRef.current = null;
-      }
-    }
-  }, []);
 
   const requestBluetoothPermissions = useCallback(async (): Promise<boolean> => {
     if (Platform.OS === 'android') {
@@ -111,62 +96,20 @@ export function BleProvider({ children, navigationRef }: BleProviderProps) {
     return true;
   }, []);
 
-  const startBleManager = useCallback(async () => {
-    if (bleMangerStarted) return; 
+  const stopScan = useCallback(async () => {
     try {
-      await BleManager.start({ showAlert: true, forceLegacy: false });
-      setBleMangerStarted(true);  
-      console.log('BleManager started');
-    } catch (err: any) {
-      console.error(err);
+      await BleManager.stopScan();
+    } catch {
       // ignore
+    } finally {
+      setIsScanning(false);
+      setScanCountdown(BLE_SCAN_SEK);
+      if (stopTimerRef.current) {
+        clearTimeout(stopTimerRef.current);
+        stopTimerRef.current = null;
+      }
     }
-  }, [bleMangerStarted]);
-
-  const waitForResponseAndContinue = async (info: any, chunks: any, index: number) => {
-    setTimeout(() => {
-      if (index === 1) {
-        /*setTimeout(() => {
-          try {
-            BleManager.disconnect(info.peripheralId);
-          } catch (e) {
-            console.log(e);
-          }
-        }, 10000);*/
-      }
-    }, 100);
-
-    try {
-      const data:any = await BleManager.read(
-        info.peripheralId,
-        info.serviceUUID,
-        info.characteristicUUID,
-      )
-      if (index === 1) {
-        // clearTimeout(this.fpTimerID);
-      }
-
-      const response = Buffer.from(data, 'binary').toString('ascii');
-      const request = Buffer.from(chunks[index], 'binary').toString('ascii');
-      console.log('read data', data, response, request.length);
-
-      if (response.indexOf('ACK') === 0) {
-        //this.setState({
-        //  progress: ((index / chunks.length) * 100).toFixed(2),
-        //});
-
-        await writeData(info, chunks, index + 1);
-      } else if (request.indexOf(response) >= 0) {
-        await waitForResponseAndContinue(info, chunks, index);
-      } else {
-        console.log('ERROR', response, data);
-        //this.navigateToFailureScreen();
-      }
-    } catch (error) {
-      console.log('ERROR: ', error);
-      BleManager.disconnect(info.peripheralId);
-    }
-  };
+  }, []);
 
   const startScan = useCallback(async () => {
     try {
@@ -185,25 +128,77 @@ export function BleProvider({ children, navigationRef }: BleProviderProps) {
         if (stopTimerRef.current) {
           clearTimeout(stopTimerRef.current);
         }
-        stopTimerRef.current = setTimeout(() => {
-          stopScan();
+        stopTimerRef.current = setTimeout(async () => {
+          await stopScan();
+          navigationRef?.navigate('SelectLock');
         }, BLE_SCAN_SEK * 1000);
       }, 500);
     } catch {
       setIsScanning(false);
       setScanCountdown(BLE_SCAN_SEK);
     }
-  }, [requestBluetoothPermissions, stopScan]);
+  }, [requestBluetoothPermissions, stopScan, navigationRef]);
 
-  const writeData = async (info: any, chunks: any, index = 0) => {
+  const checkBleState = useCallback(() => {
+    BleManager.checkState();
+  }, []);
+
+  const clearDevices = useCallback(() => {
+    setDevices([]);
+  }, []);
+
+  const startBleManager = useCallback(async () => {
+    if (bleMangerStarted) return; 
+    try {
+      await BleManager.start({ showAlert: true, forceLegacy: false });
+      setBleMangerStarted(true);  
+      console.log('BleManager started');
+    } catch (err: any) {
+      console.error(err);
+      // ignore
+    }
+  }, [bleMangerStarted]);
+
+  const waitForResponseAndContinue = useCallback(async (info: any, chunks: any, index: number) => {
+    try {
+      const request = Buffer.from(chunks[index], 'binary').toString('ascii');
+
+      const data:any = await BleManager.read(
+        info.peripheralId,
+        info.serviceUUID,
+        info.characteristicUUID,
+      )
+      const response = Buffer.from(data, 'binary').toString('ascii');
+      console.log(data, response, request.length);
+
+      if (request.indexOf('FW_Start') === 0) {
+        console.log('Firmware start');
+      } else if (request.indexOf('FW_End') === 0) {
+        console.log('Firmware update completed successfully!');
+        navigationRef?.navigate('Final');
+      }
+
+      if (response.indexOf('ACK') === 0) {
+        setIndexOfChunk(index + 1);
+
+        await writeData(info, chunks, index + 1);
+      } else if (request.indexOf(response) >= 0) {
+        await waitForResponseAndContinue(info, chunks, index);
+      } else {
+        console.log('ERROR', response, data);
+        //this.navigateToFailureScreen();
+      }
+    } catch (error) {
+      console.log('ERROR: ', error);
+      BleManager.disconnect(info.peripheralId);
+    }
+  }, []);
+
+  const writeData = useCallback(async (info: any, chunks: any, index = 0) => {
     let data: any = [...chunks[index]];
 
     if (Buffer.from(data, 'binary').toString('ascii').indexOf('FW_End') >= 0) {
-      /*this.setState({
-        progress: 100,
-        complete: true,
-      });*/
-      //return;
+      console.log('Firmware update completed successfully!');
     }
     try {
       await BleManager.write(
@@ -211,20 +206,28 @@ export function BleProvider({ children, navigationRef }: BleProviderProps) {
         info.serviceUUID,
         info.characteristicUUID,
         data,
-        Platform.OS === 'ios' ? data.length : 128,
+        128,
       )
       await waitForResponseAndContinue(info, chunks, index);
     } catch (error) {
       console.log('ERROR: ', error);
       BleManager.disconnect(info.peripheralId);
     }
-  };
+  }, [waitForResponseAndContinue]);
 
-  const updatePanel = useCallback(async (lock: BleDevice, innOrOut: number) => {
+  const updatePanel = useCallback(async (
+    lock: BleDevice, 
+    innOrOut: number
+  ) => {
     try {
       const peripheralId = lock.id;
+
+      console.log('Starting update...');
+
       const upgradeData: Buffer[] | null = await getFirmwareBlob(lock, innOrOut);
-      //console.log('firmwareBlob', upgradeData);
+      setNrOfChunks(upgradeData?.length || 0);
+      setIndexOfChunk(0);
+
       await BleManager.connect(peripheralId);
       sleep(0.5);
       const peripheralInfo = await BleManager.retrieveServices(peripheralId)
@@ -253,22 +256,42 @@ export function BleProvider({ children, navigationRef }: BleProviderProps) {
           const mtu = await BleManager.requestMTU(info.peripheralId, 256);
           console.log('requestMTU OK...', mtu);
         }
+        console.log('Uploading firmware...');
         await writeData(info, upgradeData);
+        console.log('Update completed successfully!');
       } else {
         console.log('No characteristic found ', peripheralInfo);
+        console.log('Error: No characteristic found');
       }
     } catch (error: any) {
       console.error('Error updating inside panel:', error);
+      console.log(`Error: ${error.message || 'Update failed'}`);
     }
     finally {
       await BleManager.disconnect(lock.id);
     }
-  }, [requestBluetoothPermissions, stopScan]);
+  }, [writeData]);
 
-  const fullUuid = (short: string) =>
-    short.length === 4
-      ? `0000${short.toLowerCase()}-0000-1000-8000-00805f9b34fb`
-      : short.toLowerCase();
+  const getConnectedPeripherals = useCallback(async (): Promise<string[]> => {
+    try {
+      const connected = await BleManager.getConnectedPeripherals([]);
+      // getConnectedPeripherals returns an array of Peripheral objects, extract IDs
+      return connected.map((peripheral: any) => peripheral.id || peripheral);
+    } catch (error) {
+      console.error('Error getting connected peripherals:', error);
+      return [];
+    }
+  }, []);
+
+  const isLockConnected = useCallback(async (lockId: string): Promise<boolean> => {
+    try {
+      const connected = await getConnectedPeripherals();
+      return connected.includes(lockId);
+    } catch (error) {
+      console.error('Error checking lock connection:', error);
+      return false;
+    }
+  }, [getConnectedPeripherals]);
 
   const setCurrentLock = useCallback(async (lock: BleDevice): Promise<boolean> => {
     const id = lock.id;
@@ -402,8 +425,8 @@ export function BleProvider({ children, navigationRef }: BleProviderProps) {
       
       const seriesArr = lock.name.match(/IDLock(\d{1,6})(_V_(\d_\d_\d{1,2}))?/);
       const series = seriesArr ? seriesArr[1] : 'Unknown';
-      const inVersion = await fetchVersion(series, 0);
-      const outVersion = await fetchVersion(series, 1);
+      const inVersion = await fetchVersion(series, PanelType.INSIDE_PANEL);
+      const outVersion = await fetchVersion(series, PanelType.OUTSIDE_PANEL);
       // Update lock with version and save to store
       const updatedLock: BleDevice = {
         ...lock,
@@ -417,12 +440,12 @@ export function BleProvider({ children, navigationRef }: BleProviderProps) {
       await BleManager.disconnect(id);
       
       // Navigate to HomeScreen on success
-      if (navigationRef?.isReady()) {
+      /*if (navigationRef?.isReady()) {
         navigationRef.navigate('Home');
-      }
+      }*/
       return true;
     }
-  }, [setSelectedLock, navigationRef]);
+  }, [setSelectedLock, isLockConnected]);
 
   const getCurrentLock = useCallback(async (): Promise<BleDevice> => {
     if (!selectedLock) {
@@ -430,27 +453,6 @@ export function BleProvider({ children, navigationRef }: BleProviderProps) {
     }
     return selectedLock;
   }, [selectedLock]);
-
-  const getConnectedPeripherals = useCallback(async (): Promise<string[]> => {
-    try {
-      const connected = await BleManager.getConnectedPeripherals([]);
-      // getConnectedPeripherals returns an array of Peripheral objects, extract IDs
-      return connected.map((peripheral: any) => peripheral.id || peripheral);
-    } catch (error) {
-      console.error('Error getting connected peripherals:', error);
-      return [];
-    }
-  }, []);
-
-  const isLockConnected = useCallback(async (lockId: string): Promise<boolean> => {
-    try {
-      const connected = await getConnectedPeripherals();
-      return connected.includes(lockId);
-    } catch (error) {
-      console.error('Error checking lock connection:', error);
-      return false;
-    }
-  }, [getConnectedPeripherals]);
 
   // countdown
   useEffect(() => {
@@ -472,12 +474,19 @@ export function BleProvider({ children, navigationRef }: BleProviderProps) {
       const { localName } = peripheral.advertising;
       if (!localName || !peripheral?.name) return;
       console.log('Discovered peripheral:', peripheral);
-      if (peripheral.name?.includes('IDLock') || peripheral.name?.includes('Bose')) {
-        setIdlockDevices(prev => {
+      if (peripheral.name?.includes('IDLock')) {
+        setIdlockDevices((prev) => {
           const exists = prev.find(d => d.id === peripheral.id);
           if (exists) {
             return prev.map(d => (d.id === peripheral.id ? { id: peripheral.id, name: peripheral.name, rssi: peripheral.rssi, idlock: true, version: d.version || '' } : d));
           }
+          stopScan()
+          .then(() => {
+            const type = peripheral.name?.includes('150') ? '150' : '202';
+            setType(type);
+            navigationRef?.navigate('Home', { peripheral: peripheral as BleDevice } as any);
+          });
+          
           return [...prev, { id: peripheral.id, name: peripheral.name, rssi: peripheral.rssi, idlock: true, version: '' }]
         });
       } else {
@@ -508,13 +517,15 @@ export function BleProvider({ children, navigationRef }: BleProviderProps) {
       updateState.remove();
       lockDisconnected.remove();
     };
-  }, [bleManagerEmitter]);
+  }, [bleManagerEmitter, navigationRef, setType, stopScan]);
 
   const value: BleContextValue = useMemo(() => ({
     devices,
     idlockDevices,
     isScanning,
     scanCountdown,
+    indexOfChunk,
+    nrOfChunks,
     startScan,
     stopScan,
     clearDevices,
@@ -525,7 +536,7 @@ export function BleProvider({ children, navigationRef }: BleProviderProps) {
     isLockConnected,
     getConnectedPeripherals,
     updatePanel,  
-  }), [devices, idlockDevices, isScanning, scanCountdown, startScan, stopScan, clearDevices, bluetoothState, checkBleState, setCurrentLock, getCurrentLock, isLockConnected, getConnectedPeripherals, updatePanel]);
+  }), [devices, idlockDevices, isScanning, scanCountdown, indexOfChunk, nrOfChunks, startScan, stopScan, clearDevices, bluetoothState, checkBleState, setCurrentLock, getCurrentLock, isLockConnected, getConnectedPeripherals, updatePanel]);
 
   const hideErrorModal = useCallback(() => {
     setErrorModalVisible(false);

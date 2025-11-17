@@ -1,136 +1,86 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, Image, Animated } from 'react-native';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { View, Text, Image, Animated, ActivityIndicator } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Appbar, Menu, Button, ProgressBar } from 'react-native-paper';
+import { ProgressBar } from 'react-native-paper';
 import { RootStackParamList } from '../navigation/types';
 import { useAppStore } from '../store/store';
-/*import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  withRepeat,
-} from 'react-native-reanimated';*/
 import { useBle } from '../ble/BleProvider';
+//import { useSnackbar } from '../components/SnackbarProvider';
+import { Fonts } from '../utils/fonts';
+import ScreenButton from '../components/ScreenButton';
+import { PanelType } from '../utils/constants';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
-export default function HomeScreen({ navigation }: Props) {
-  const [progress, setProgress] = useState(0);
-  const rotateAnim = useRef(new Animated.Value(0)).current;
+export default function HomeScreen({ route }: Props) {
+  const state = useAppStore((state: any) => state);
+  const { peripheral } = route.params;
   const [isUpdating, setIsUpdating] = useState(false);
-
-  const { updatePanel } = useBle();
-
-  /*const rotation = useSharedValue(0);
-  const animatedStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ rotate: `${rotation.value}deg` }],
-    };
-  });*/
-
+  const [isUpdatingFirmware, setIsUpdatingFirmware] = useState(false);
+  //const [firmwareProgress, setFirmwareProgress] = useState(0);
+  const { updatePanel, setCurrentLock, nrOfChunks, indexOfChunk } = useBle();
   const selectedLock = useAppStore((state) => state.selectedLock);
-  const [menuVisible, setMenuVisible] = useState(false);
-
-  const openMenu = () => setMenuVisible(true);
-  const closeMenu = () => setMenuVisible(false);
-
-  const handleMenuItemPress = (action: string) => {
-    console.log('Menu item pressed:', action);
-    closeMenu();
-    // TODO: Implement menu actions
-  };
-
-  /*eact.useEffect(() => {
-    rotation.value = withRepeat(
-      withTiming(360, { duration: 2000 }),
-      -1, // infinite
-      false
-    );
-  }, [rotation]);*/
-  useEffect(() => {
-    Animated.loop(
-      Animated.timing(rotateAnim, {
-        toValue: 1,
-        duration: 3000,
-        useNativeDriver: true,
-      })
-    ).start();
-  }, [rotateAnim]);
+  //const { showSnackbar } = useSnackbar();
   
-  const spin = rotateAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  });
+  const progress = (indexOfChunk / nrOfChunks);
 
-  const doUpdating = (innOrOut: number) => {
-    updatePanel(selectedLock, innOrOut);
+  const handleSetCurrentLock = useCallback(async () => {
+    try {
+      await setCurrentLock(peripheral);
+    } catch (error) {
+      console.error('Error setting current lock:', error);
+    } finally {
+      setIsUpdating(false);
+    }
+  }, [peripheral, setCurrentLock]);
 
-    /*setIsUpdating(true);
-    setProgress(0);
-    setInterval(() => {
-      setProgress(progress + 0.1);
-    }, 1000);*/
+  useEffect(() => {
+    setIsUpdating(true);
+    handleSetCurrentLock();
+  }, [handleSetCurrentLock]);
+
+  const doUpdating = async (innOrOut: number) => {
+    setIsUpdatingFirmware(true);
+    try {
+      await updatePanel(state.selectedLock, innOrOut);
+    } catch (error) {
+      console.error('Error updating firmware:', error);
+    } finally {
+      setIsUpdatingFirmware(false);
+    }
   };
 
   return (
-    <View className="flex-1">
-      <Appbar.Header>
-        <Appbar.Content titleStyle={{ fontSize: 20, fontWeight: 'bold', color: 'blue' }} title={selectedLock?.name || 'No Lock Selected'} />
-        <Menu
-          visible={menuVisible}
-          onDismiss={closeMenu}
-          anchor={<Appbar.Action icon="dots-vertical" onPress={openMenu} />}
-          anchorPosition="bottom"
-        >
-          <Menu.Item
-            onPress={() => handleMenuItemPress('settings')}
-            title="Settings"
-            leadingIcon="cog"
-          />
-          <Menu.Item
-            onPress={() => handleMenuItemPress('disconnect')}
-            title="Disconnect"
-            leadingIcon="bluetooth-off"
-          />
-          <Menu.Item
-            onPress={() => handleMenuItemPress('about')}
-            title="About"
-            leadingIcon="information"
-          />
-        </Menu>
-      </Appbar.Header>
-      <View className="flex-1 items-start p-5">
-        <View className="flex-row justify-between w-full">
-          <Text className="text-lg font-bold mb-1">{`Current Inside panel version`}</Text>
-          <Text className="text-lg font-bold mb-1">{`${selectedLock?.version}`}</Text>
-        </View>
-        <View className="flex-row justify-between w-full">
-          <Text className="text-lg font-bold mb-1">{`Available Inside panel version`}</Text>
-          <Text className="text-lg font-bold mb-1">{`${selectedLock?.inVersion || 'Unknown'}`}</Text>
-        </View>
-        <View className="flex-row justify-between w-full">
-          <Text className="text-lg font-bold mb-1">{`Current Outside panel version`}</Text>
-          <Text className="text-lg font-bold mb-1">{`Unknown`}</Text>
-        </View>
-        <View className="flex-row justify-between w-full">
-          <Text className="text-lg font-bold mb-1">{`Available Outside panel version`}</Text>
-          <Text className="text-lg font-bold mb-1">{`${selectedLock?.outVersion || 'Unknown'}`}</Text>
-        </View>
-        <View className="flex-row justify-center w-full mt-4">
-          <Button mode="elevated" icon="bluetooth-audio" onPress={() => doUpdating(0)} >
-            Update Outside panel
-          </Button>
-        </View>
-        <View className="flex-row justify-center w-full mt-4">
-          <Button mode="elevated" icon="bluetooth-audio" onPress={() => doUpdating(1)} >
-            Update Inside panel
-          </Button>
-        </View>
-        <View className="flex-row justify-center w-full mt-4">
-          <ProgressBar progress={progress} visible={isUpdating} className="w-96 h-2 mt-4" />
-{/*           <Animated.Image source={require('../../assets/updating_logo.png')} className="w-96 h-96 mb-4" resizeMode="contain" 
-          style={{transform: [{rotate: spin}]}}/> */}
-        </View>
+    <View className="flex-1 justify-between mt-10">
+      <View className="w-full items-center mt-10">
+        <Text className="text-xl font-bold mb-1 text-gray-400" style={{ fontFamily: Fonts.ColabMed }}>Connected to</Text>
+        <Text className="text-xl font-bold mb-1" style={{ fontFamily: Fonts.ColabMed }}>{`ID Lock ${state.type}`}</Text>
+      </View>
+      <View className="items-center">
+        <Animated.Image source={require('../../assets/connected_logo.png')} className="w-40 h-40 mb-4" resizeMode="contain" />
+      </View>
+      <View className="w-full items-center mb-20">
+        {
+          isUpdating ? 
+          <>
+            <ActivityIndicator size="large" className="mb-4 text-gray-500"/>
+            <Text className="text-sm text-gray-400 font-bold mb-1">Getting current version...</Text>
+          </>
+          : (
+            <>
+              <Text className="text-sm text-gray-400 font-bold mb-1">{`Your current version is: ${selectedLock?.inVersion || 'Unknown'}`}</Text>
+              <Text className="text-smg font-bold mb-2">{`Firmware version ${selectedLock?.inVersion || 'Unknown'} is available`}</Text>
+            </>
+          )
+        }
+        {
+          isUpdatingFirmware ?
+            <View className="items-center mb-14">
+              <ProgressBar progress={progress} visible={true} className="w-96 mt-2" />
+            </View>
+          :
+            <ScreenButton onPress={() => doUpdating(PanelType.INSIDE_PANEL)} label="Update..." />
+        }
       </View>
     </View>
   );
